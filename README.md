@@ -34,6 +34,10 @@ The application uses environment variables for configuration:
 
 *While HMAC_KEY is optional, it's strongly recommended for production deployments.
 
+## Demo
+
+![HCP Terraform Teams Approval Workflow](images/pre-plan-approval.gif)
+
 ## Local Development
 
 1. Clone the repository
