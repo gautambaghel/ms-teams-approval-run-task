@@ -1,6 +1,6 @@
-# Terraform Cloud MS Teams Approval Integration
+# HCP Terraform MS Teams Approval Integration
 
-This application serves as a run task integration between HashiCorp Terraform Cloud/Enterprise and Microsoft Teams, enabling approval workflows for Terraform runs directly through Teams notifications.
+This application serves as a run task integration between HashiCorp HCP Terraform/Enterprise and Microsoft Teams, enabling approval workflows for Terraform runs directly through Teams notifications.
 
 ## Features
 
@@ -160,3 +160,5 @@ Query parameters:
 3. Submit a pull request
 
 ## License
+
+Mozilla Public License Version 2.0
