@@ -100,13 +100,13 @@ if not HMAC_KEY:
 @app.before_request
 def verify_hmac():
     """
-    Enforce these rules on POST /run-task-check:
+    Enforce these rules on POST /teams-approval:
       - If BOTH sides have HMAC, we validate.
       - If NEITHER side has HMAC, skip validation (allow).
       - If incoming signature but no local key => reject (403).
       - If local key but no incoming signature => reject (403).
     """
-    if request.path == "/run-task-check" and request.method == "POST":
+    if request.path == "/teams-approval" and request.method == "POST":
         local_key_configured = bool(HMAC_KEY)
         inbound_signature = request.headers.get("X-Tfc-Task-Signature")
         inbound_has_hmac = bool(inbound_signature)
@@ -122,10 +122,8 @@ def verify_hmac():
             ).hexdigest()
 
             if not hmac.compare_digest(computed_signature, provided_signature):
-                print("Invalid HMAC signature")
                 return "Invalid HMAC signature", 403
 
-            print("Valid HMAC signature")
             return  # Valid HMAC, so continue
 
         # CASE 2: neither side has HMAC
@@ -142,7 +140,7 @@ def verify_hmac():
             return ("No HMAC signature was provided, but a local key is configured. "
                     "Request is rejected."), 403
 
-@app.route("/run-task-check", methods=["POST"])
+@app.route("/teams-approval", methods=["POST"])
 def run_task_check():
     """
     Terraform/HCP calls this endpoint with a JSON payload like:
@@ -168,18 +166,26 @@ def run_task_check():
     try:
         payload = request.get_json() or {}
 
+
         # Required ephemeral token data
         access_token = payload.get("access_token")
         callback_url = payload.get("task_result_callback_url")
         run_id = payload.get("run_id", "unknown-run-id")
+        stage  = payload.get("stage", "unknown-stage")
 
         if not access_token or not callback_url:
             return "Missing 'access_token' or 'task_result_callback_url'", 400
+        
+        if access_token == "test-token" and stage == "test":
+            print(f"Received test token")
+            return "Test token received. No action taken.", 200
 
         # Additional metadata
         run_created_by = payload.get("run_created_by", "")
         is_speculative = payload.get("is_speculative")  # bool
         run_message = payload.get("run_message", "")
+        organization = payload.get("organization_name", "unknown-organization")
+        workspace = payload.get("workspace_name", "unknown-workspace")
 
         # Links
         vcs_pull_request_url = payload.get("vcs_pull_request_url")
@@ -198,14 +204,16 @@ def run_task_check():
 
         # Build the message body (Markdown)
         message_lines = []
-        message_lines.append(f"Terraform/HCP Run ID: **{run_id}** needs approval.")
+        message_lines.append(f"Workspace **{workspace}** has requested approval.")
+        message_lines.append(f"Run ID: **{run_id}**")
+        message_lines.append(f"Stage: **{stage}**")
 
         if run_created_by:
             message_lines.append(f"Triggered by: **{run_created_by}**")
 
         if is_speculative is not None:
             spec_label = "Yes" if is_speculative else "No"
-            message_lines.append(f"Speculative?: **{spec_label}**")
+            message_lines.append(f"Speculative: **{spec_label}**")
 
         if run_message:
             message_lines.append(f"Run Message: {run_message}")
@@ -229,7 +237,7 @@ def run_task_check():
         # POST to Teams
         resp = requests.post(TEAMS_WEBHOOK_URL, json=teams_message)
         resp.raise_for_status()
-        print(f"Posted message to Teams for Run ID: {run_id}")
+        print(f"Workspace **{workspace}** has requested approval for run {run_id}.")
         return "Run task received. Posted message to Teams.", 200
 
     except Exception as e:

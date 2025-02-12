@@ -1,10 +1,10 @@
 # HCP Terraform MS Teams Approval Integration
 
-This application serves as a run task integration between HashiCorp HCP Terraform/Enterprise and Microsoft Teams, enabling approval workflows for Terraform runs directly through Teams notifications.
+This application serves as a run task integration between HCP Terraform/Enterprise and Microsoft Teams, enabling approval workflows for Terraform runs directly through Teams notifications.
 
 ## Features
 
-- Receives run task webhooks from Terraform Cloud/Enterprise
+- Receives run task webhooks from HCP Terraform/Terraform Enterprise
 - Posts interactive approval messages to MS Teams channels
 - Supports approval/rejection via clickable links in Teams
 - Optional Redis integration for distributed deployments
@@ -16,9 +16,9 @@ This application serves as a run task integration between HashiCorp HCP Terrafor
 
 - Python 3.12+
 - Microsoft Teams webhook URL
-- Terraform Cloud/Enterprise account with run tasks enabled
+- HCP Terraform/Terraform Enterprise account with run tasks enabled
 - (Optional) Redis instance for distributed deployments
-- Azure subscription (for deployment)
+- (Optional) Azure subscription (for deployment)
 
 ## Configuration
 
@@ -102,8 +102,10 @@ terraform apply
 
 ## API Endpoints
 
-### POST /run-task-check
-Receives run task webhooks from Terraform Cloud/Enterprise.
+### POST /teams-approval
+Receives run task webhooks from HCP Terraform/Terraform Enterprise.
+
+Full API and data model is documented in the [HashiCorp Run Task API documentation](https://developer.hashicorp.com/terraform/cloud-docs/integrations/run-tasks)
 
 Request body example:
 ```json
@@ -136,7 +138,7 @@ Query parameters:
 
 1. HMAC Verification:
    - Enable HMAC verification by setting the `HMAC_KEY` environment variable
-   - Terraform Cloud/Enterprise will sign requests with this key
+   - HCP Terraform/Terraform Enterprise will sign requests with this key
    - Requests without valid signatures will be rejected
 
 2. Ephemeral Tokens:
@@ -152,7 +154,7 @@ Query parameters:
 ## Monitoring and Logging
 
 - Application logs are sent to stdout/stderr
-- When deployed to Azure:
+- (Optional) When deployed to Azure:
   - Logs are collected by Log Analytics
   - Container App metrics are available
   - Redis Cache metrics are monitored
