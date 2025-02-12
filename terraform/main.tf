@@ -105,6 +105,10 @@ resource "azurerm_container_app" "run_task" {
         value = "https://teams-approval-run-task.${var.run_task_domain_suffix}"
       }
       env {
+        name  = "FILTER_SPECULATIVE_PLANS_ONLY"
+        value = var.filter_speculative_plans_only
+      }
+      env {
         name        = "REDIS_PASSWORD"
         secret_name = "redis-password"
       }

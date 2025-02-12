@@ -42,3 +42,9 @@ variable "run_task_domain_suffix" {
   type        = string
   default     = "onmi.cloud"
 }
+
+variable "filter_speculative_plans_only" {
+  description = "Whether to only filter speculative plans."
+  type        = bool
+  default     = false
+}
