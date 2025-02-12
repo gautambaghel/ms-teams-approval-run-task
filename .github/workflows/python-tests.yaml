@@ -12,6 +12,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: build/python
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
@@ -27,7 +30,6 @@ jobs:
 
     - name: Install dependencies
       run: |
-        cd build/python
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements-test.txt
