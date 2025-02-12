@@ -13,3 +13,4 @@
 .terraform.lock.hcl
 
 __pycache__
+.coverage

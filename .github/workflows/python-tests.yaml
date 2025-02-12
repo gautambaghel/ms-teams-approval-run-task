@@ -34,27 +34,30 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements-test.txt
 
-    - name: Run tests with pytest
-      run: |
-        pytest --cov=app tests/ -v
-
+        - name: Run tests with pytest
+        run: |
+          pytest --cov=app --cov-report=html --cov-report=xml --junitxml=pytest.xml tests/ -v
+  
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
       with:
         name: coverage-report-python-${{ matrix.python-version }}
-        path: .coverage
-        if-no-files-found: ignore
+        path: |
+            build/python/.coverage
+            build/python/htmlcov/
+            build/python/coverage.xml
+            if-no-files-found: ignore
 
     - name: Coverage report to PR comment
       if: github.event_name == 'pull_request' && matrix.python-version == '3.12'
+      working-directory: build/python
       run: |
         coverage report
         coverage html
-      continue-on-error: true
 
-    - name: GitHub Action for pytest coverage report
-      uses: MishaKav/pytest-coverage-comment@main
+    - name: GitHub Action for pytest coverage comment
       if: github.event_name == 'pull_request' && matrix.python-version == '3.12'
+      uses: MishaKav/pytest-coverage-comment@main
       with:
-        pytest-coverage-path: ./htmlcov/index.html
-        junitxml-path: ./pytest.xml
+        pytest-coverage-path: ./build/python/htmlcov/index.html
+        junitxml-path: ./build/python/pytest.xml
