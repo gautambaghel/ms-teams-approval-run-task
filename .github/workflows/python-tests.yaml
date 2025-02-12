@@ -84,4 +84,6 @@ jobs:
           file: build/Containerfile
           platforms: linux/amd64
           push: true
-          tags: quay.io/benjamin_holmes/teams-approval-run-task:latest
+          tags: | 
+            quay.io/benjamin_holmes/teams-approval-run-task:latest
+            quay.io/benjamin_holmes/teams-approval-run-task:nightly-${{ steps.date.outputs.date }}
