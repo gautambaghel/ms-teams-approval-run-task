@@ -34,8 +34,8 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements-test.txt
 
-        - name: Run tests with pytest
-        run: |
+    - name: Run tests with pytest
+      run: |
           pytest --cov=app --cov-report=html --cov-report=xml --junitxml=pytest.xml tests/ -v
   
     - name: Upload coverage report
