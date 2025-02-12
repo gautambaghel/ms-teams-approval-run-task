@@ -1,0 +1,58 @@
+name: Python Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run every day at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        cd build/python
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+
+    - name: Run tests with pytest
+      run: |
+        pytest --cov=app tests/ -v
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-python-${{ matrix.python-version }}
+        path: .coverage
+        if-no-files-found: ignore
+
+    - name: Coverage report to PR comment
+      if: github.event_name == 'pull_request' && matrix.python-version == '3.12'
+      run: |
+        coverage report
+        coverage html
+      continue-on-error: true
+
+    - name: GitHub Action for pytest coverage report
+      uses: MishaKav/pytest-coverage-comment@main
+      if: github.event_name == 'pull_request' && matrix.python-version == '3.12'
+      with:
+        pytest-coverage-path: ./htmlcov/index.html
+        junitxml-path: ./pytest.xml

@@ -11,3 +11,5 @@
 
 # Ignore the Terraform .terraform.lock.hcl file
 .terraform.lock.hcl
+
+__pycache__
