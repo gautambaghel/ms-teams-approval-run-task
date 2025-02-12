@@ -1,3 +1,6 @@
+[![Python Tests](https://github.com/benemon/ms-teams-approval-run-task/actions/workflows/python-tests.yaml/badge.svg)](https://github.com/benemon/ms-teams-approval-run-task/actions/workflows/python-tests.yaml)
+[![Container Repository on Quay](https://quay.io/repository/benjamin_holmes/teams-approval-run-task/status "Container Repository on Quay")](https://quay.io/repository/benjamin_holmes/teams-approval-run-task)
+
 # HCP Terraform MS Teams Approval Integration
 
 This application serves as a run task integration between HCP Terraform/Terraform Enterprise and Microsoft Teams, enabling approval workflows for Terraform runs directly through Teams notifications.
