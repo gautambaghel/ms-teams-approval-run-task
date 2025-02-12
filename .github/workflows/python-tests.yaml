@@ -89,7 +89,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./build
+          context: build/
           file: Containerfile  # Just the filename since context is set
           platforms: linux/amd64
           push: true
