@@ -1,6 +1,8 @@
 # HCP Terraform MS Teams Approval Integration
 
-This application serves as a run task integration between HCP Terraform/Enterprise and Microsoft Teams, enabling approval workflows for Terraform runs directly through Teams notifications.
+This application serves as a run task integration between HCP Terraform/Terraform Enterprise and Microsoft Teams, enabling approval workflows for Terraform runs directly through Teams notifications.
+
+![HCP Terraform Teams Approval Workflow](images/pre-plan-approval.gif)
 
 ## Features
 
@@ -10,7 +12,9 @@ This application serves as a run task integration between HCP Terraform/Enterpri
 - Optional Redis integration for distributed deployments
 - HMAC request verification for security
 - Containerized deployment using Red Hat UBI base image
-- Infrastructure as Code deployment to Azure Container Apps
+- Example Infrastructure as Code deployment to Azure Container Apps (can be adapted for other platforms)
+- Optional filtering for speculative plans only
+- Auto-approval for non-speculative runs when filtering is enabled
 
 ## Prerequisites
 
@@ -18,27 +22,30 @@ This application serves as a run task integration between HCP Terraform/Enterpri
 - Microsoft Teams webhook URL
 - HCP Terraform/Terraform Enterprise account with run tasks enabled
 - (Optional) Redis instance for distributed deployments
-- (Optional) Azure subscription (for deployment)
+- Container hosting platform of your choice (example provided for Azure Container Apps)
 
 ## Configuration
 
 The application uses environment variables for configuration:
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `TEAMS_WEBHOOK_URL` | MS Teams incoming webhook URL | Yes |
-| `BASE_PUBLIC_URL` | Public URL where the app is accessible | Yes |
-| `HMAC_KEY` | Secret key for HMAC verification | No* |
-| `REDIS_URL` | Redis connection URL | No |
-| `REDIS_PASSWORD` | Redis authentication password | No |
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `TEAMS_WEBHOOK_URL` | MS Teams incoming webhook URL | Yes | - |
+| `BASE_PUBLIC_URL` | Public URL where the app is accessible | Yes | - |
+| `HMAC_KEY` | Secret key for HMAC verification | No* | - |
+| `REDIS_URL` | Redis connection URL | No | - |
+| `REDIS_PASSWORD` | Redis authentication password | No | - |
+| `FILTER_SPECULATIVE_PLANS_ONLY` | Only require approval for speculative plans | No | false |
 
 *While HMAC_KEY is optional, it's strongly recommended for production deployments.
 
-## Demo
+## Deployment Options
 
-![HCP Terraform Teams Approval Workflow](images/pre-plan-approval.gif)
+This application can be deployed in several ways:
 
-## Local Development
+### Direct Python Execution
+
+The simplest deployment method, suitable for development, testing, or simple environments:
 
 1. Clone the repository
 2. Install dependencies:
@@ -50,14 +57,26 @@ pip install -r requirements.txt
 ```bash
 export TEAMS_WEBHOOK_URL="your-teams-webhook-url"
 export BASE_PUBLIC_URL="http://localhost:8080"
+# Optional: Enable speculative plan filtering
+export FILTER_SPECULATIVE_PLANS_ONLY="true"
 ```
 
-4. Run the development server:
+4. Run the application:
 ```bash
+# Development server
 python app.py
+
+# Production server
+gunicorn --bind 0.0.0.0:8080 app:app
 ```
 
-## Docker Build & Run
+### Containerized Deployment (Recommended for Production)
+
+Containerization is the recommended approach for production deployments as it provides:
+- Consistent runtime environment
+- Easy scaling and management
+- Platform independence
+- Simple deployment to container orchestration platforms
 
 Build the container:
 ```bash
@@ -72,9 +91,18 @@ podman run -p 8080:8080 \
   terraform-teams-integration
 ```
 
-## Production Deployment
+### Production Platform Deployment
 
-The application is designed to be deployed to Azure Container Apps using Terraform. The included Terraform configuration:
+The application can be deployed to any platform that supports Python applications or containerized workloads. This repository includes an example deployment to Azure Container Apps using Terraform, but the application can be adapted to run on other platforms such as:
+
+- Cloud container services (AWS ECS, Google Cloud Run)
+- Kubernetes clusters
+- Traditional VM or bare metal hosts
+- Platform-as-a-Service providers
+
+#### Example: Azure Container Apps Deployment
+
+The included Terraform configuration demonstrates deployment to Azure Container Apps:
 
 - Creates an Azure Container App Environment
 - Deploys Redis Cache for state management
@@ -89,7 +117,9 @@ terraform plan
 terraform apply
 ```
 
-### Required Terraform Variables
+### Example Deployment Configuration
+
+The included Azure Container Apps Terraform configuration requires these variables:
 
 - `resource_group`
 - `virtual_network`
@@ -99,6 +129,13 @@ terraform apply
 - `run_task_container_image`
 - `run_task_domain_suffix`
 - `run_task_hmac_key`
+
+When deploying to other platforms, you'll need to adapt the infrastructure code to your chosen platform's requirements while ensuring:
+
+1. The container is accessible via HTTPS
+2. Environment variables are properly configured
+3. Redis is available if distributed deployment is needed
+4. Proper monitoring and logging are set up
 
 ## API Endpoints
 
@@ -115,11 +152,26 @@ Request body example:
   "run_id": "run-ABC123",
   "run_created_by": "jdoe",
   "is_speculative": false,
+  "workspace_name": "my-workspace",
+  "stage": "pre-plan",
   "run_message": "Triggered via UI",
   "vcs_pull_request_url": "...",
   "vcs_commit_url": "...",
   "workspace_app_url": "..."
 }
+```
+
+Teams message format:
+```
+Workspace **my-workspace** has requested approval.
+Run ID: **run-ABC123**
+Stage: **pre-plan**
+Speculative: **Yes**
+Triggered by: **jdoe**
+Run Message: Example message
+[Open Workspace](workspace_url)
+[View Pull Request](pr_url)
+[Approve](approve_url) | [Reject](reject_url)
 ```
 
 ### GET /approve
@@ -154,10 +206,15 @@ Query parameters:
 ## Monitoring and Logging
 
 - Application logs are sent to stdout/stderr
-- (Optional) When deployed to Azure:
-  - Logs are collected by Log Analytics
-  - Container App metrics are available
-  - Redis Cache metrics are monitored
+- Platform-specific monitoring options:
+  - When using Azure (example deployment):
+    - Logs are collected by Log Analytics
+    - Container App metrics are available
+    - Redis Cache metrics are monitored
+  - Other platforms:
+    - Use your platform's native monitoring solutions
+    - Consider using cloud-native logging aggregation
+    - Monitor Redis metrics if using distributed deployment
 
 ## Contributing
 
