@@ -13,6 +13,12 @@ variable "virtual_network" {
   type        = string
 }
 
+variable "run_task_teams_webhook_url" {
+  description = "The URL of the Teams Incoming Webhook to post to."
+  type        = string
+
+}
+
 variable "run_task_container_image" {
   description = "The container image to use for the run task."
   type        = string
@@ -26,21 +32,14 @@ variable "run_task_container_registry" {
 
 }
 
-variable "teams_webhook_url" {
-  description = "The URL of the Teams Incoming Webhook to post to."
-  type        = string
-
-}
-
 variable "run_task_hmac_key" {
   description = "The HMAC key to verify incoming requests are valid and correct"
   type        = string
 }
 
-variable "run_task_domain_suffix" {
-  description = "The domain name to use for the run task."
+variable "run_task_base_public_url" {
+  description = "The publically resolvable domain name for the run task used to construct approval URLs."
   type        = string
-  default     = "onmi.cloud"
 }
 
 variable "filter_speculative_plans_only" {

@@ -127,7 +127,7 @@ def verify_hmac():
             return "No HMAC signature was provided, but we require one.", 403
 
 
-def patch_terraform_callback(run_id, access_token, callback_url, status, message):
+def patch_terraform_callback(access_token, callback_url, status, message):
     """
     A helper function to send a PATCH to Terraform’s task callback URL.
     - `status` should be one of: ["passed", "failed"] (or "canceled").
@@ -186,7 +186,6 @@ def teams_approval():
             # so the pipeline doesn’t get stuck.
             try:
                 patch_terraform_callback(
-                    run_id,
                     access_token,
                     callback_url,
                     "passed",
@@ -266,7 +265,6 @@ def approve():
 
     try:
         patch_terraform_callback(
-            run_id,
             access_token,
             callback_url,
             "passed",
@@ -298,7 +296,6 @@ def reject():
 
     try:
         patch_terraform_callback(
-            run_id,
             access_token,
             callback_url,
             "failed",

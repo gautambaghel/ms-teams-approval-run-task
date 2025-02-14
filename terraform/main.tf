@@ -102,7 +102,7 @@ resource "azurerm_container_app" "run_task" {
       }
       env {
         name  = "BASE_PUBLIC_URL"
-        value = "https://teams-approval-run-task.${var.run_task_domain_suffix}"
+        value = var.run_task_base_public_url
       }
       env {
         name  = "FILTER_SPECULATIVE_PLANS_ONLY"
@@ -147,7 +147,7 @@ resource "azurerm_container_app" "run_task" {
 
   secret {
     name  = "teams-webhook-url"
-    value = var.teams_webhook_url
+    value = var.run_task_teams_webhook_url
   }
 
   secret {

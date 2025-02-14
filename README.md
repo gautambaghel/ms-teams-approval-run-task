@@ -127,11 +127,13 @@ The included Azure Container Apps Terraform configuration requires these variabl
 - `resource_group`
 - `virtual_network`
 - `subnet`
-- `teams_webhook_url`
+- `run_task_teams_webhook_url`
 - `run_task_container_registry`
 - `run_task_container_image`
-- `run_task_domain_suffix`
+- `run_task_base_public_url`
 - `run_task_hmac_key`
+
+Optionally, the deployed can be configured to filter for speculative plans using the `filter_speculative_plans_only` variable.
 
 When deploying to other platforms, you'll need to adapt the infrastructure code to your chosen platform's requirements while ensuring:
 
