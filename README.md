@@ -22,7 +22,7 @@ This application serves as a run task integration between HCP Terraform/Terrafor
 ## Prerequisites
 
 - Python 3.12+
-- Microsoft Teams webhook URL
+- Access to build Microsoft Teams workflows
 - HCP Terraform/Terraform Enterprise account with run tasks enabled
 - (Optional) Redis instance for distributed deployments
 - Container hosting platform of your choice (example provided for Azure Container Apps)

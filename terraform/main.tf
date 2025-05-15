@@ -1,45 +1,63 @@
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "4.18.0"
-    }
-  }
-}
-
-provider "azurerm" {
-  features {}
-  resource_provider_registrations = "core"
-  resource_providers_to_register = [
-    "Microsoft.Cache",
-    "Microsoft.App", # Required for Container Apps
-  ]
-}
-
 locals {
   container_image = "${var.run_task_container_registry}/${var.run_task_container_image}"
+  resource_group  = var.create_resource_group ? azurerm_resource_group.run_task[0].name : data.azurerm_resource_group.run_task[0].name
+  subnet          = var.create_network_resources ? azurerm_subnet.run_task[0].id : data.azurerm_subnet.run_task[0].id
 }
 
 data "azurerm_resource_group" "run_task" {
-  name = var.resource_group
+  count = var.create_resource_group ? 0 : 1
+  name  = var.resource_group
+}
+
+resource "azurerm_resource_group" "run_task" {
+  count    = var.create_resource_group ? 1 : 0
+  name     = var.resource_group
+  location = var.location
 }
 
 data "azurerm_subnet" "run_task" {
+  count                = var.create_network_resources ? 0 : 1
   name                 = var.subnet
   virtual_network_name = var.virtual_network
-  resource_group_name  = data.azurerm_resource_group.run_task.name
+  resource_group_name  = var.create_resource_group ? azurerm_resource_group.run_task[0].name : data.azurerm_resource_group.run_task[0].name
+}
+
+resource "azurerm_virtual_network" "run_task" {
+  count               = var.create_network_resources ? 1 : 0
+  name                = "run-task-vnet"
+  address_space       = var.vnet_prefixes
+  location            = var.location
+  resource_group_name = azurerm_resource_group.run_task[0].name
+}
+
+resource "azurerm_subnet" "run_task" {
+  count                = var.create_network_resources ? 1 : 0
+  name                 = "run-task-subnet"
+  resource_group_name  = azurerm_resource_group.run_task[0].name
+  virtual_network_name = azurerm_virtual_network.run_task[0].name
+  address_prefixes     = var.subnet_address_prefixes
+}
+
+resource "random_string" "hmac_key" {
+  length  = 16
+  special = false
+  upper   = false
+}
+
+locals {
+  hmac_key = var.run_task_hmac_key != "" ? var.run_task_hmac_key : random_string.hmac_key.result
 }
 
 resource "azurerm_user_assigned_identity" "run_task" {
-  location            = data.azurerm_resource_group.run_task.location
-  resource_group_name = data.azurerm_resource_group.run_task.name
+  location            = var.location
+  resource_group_name = local.resource_group
   name                = "teams-approval-run-task-identity"
 }
 
 resource "azurerm_redis_cache" "run_task" {
   name                 = "hcp-tf-run-task-cache"
-  location             = data.azurerm_resource_group.run_task.location
-  resource_group_name  = data.azurerm_resource_group.run_task.name
+  location             = var.location
+  resource_group_name  = local.resource_group
   capacity             = 0
   family               = "C"
   sku_name             = "Standard"
@@ -59,8 +77,8 @@ resource "azurerm_redis_cache" "run_task" {
 # Log Analytics workspace for Container Apps
 resource "azurerm_log_analytics_workspace" "run_task" {
   name                = "teams-approval-run-task-logs"
-  location            = data.azurerm_resource_group.run_task.location
-  resource_group_name = data.azurerm_resource_group.run_task.name
+  location            = var.location
+  resource_group_name = local.resource_group
   sku                 = "PerGB2018"
   retention_in_days   = 30
 }
@@ -68,18 +86,18 @@ resource "azurerm_log_analytics_workspace" "run_task" {
 # Container Apps Environment
 resource "azurerm_container_app_environment" "run_task" {
   name                       = "teams-approval-run-task-env"
-  location                   = data.azurerm_resource_group.run_task.location
-  resource_group_name        = data.azurerm_resource_group.run_task.name
+  location                   = var.location
+  resource_group_name        = local.resource_group
   log_analytics_workspace_id = azurerm_log_analytics_workspace.run_task.id
 
-  infrastructure_subnet_id = data.azurerm_subnet.run_task.id
+  infrastructure_subnet_id = local.subnet
 }
 
 # Container App
 resource "azurerm_container_app" "run_task" {
   name                         = "teams-approval-run-task"
   container_app_environment_id = azurerm_container_app_environment.run_task.id
-  resource_group_name          = data.azurerm_resource_group.run_task.name
+  resource_group_name          = local.resource_group
   revision_mode                = "Single"
 
   identity {
@@ -99,10 +117,6 @@ resource "azurerm_container_app" "run_task" {
       env {
         name  = "REDIS_URL"
         value = "rediss://${azurerm_redis_cache.run_task.hostname}:${azurerm_redis_cache.run_task.ssl_port}"
-      }
-      env {
-        name  = "BASE_PUBLIC_URL"
-        value = var.run_task_base_public_url
       }
       env {
         name  = "FILTER_SPECULATIVE_PLANS_ONLY"
@@ -152,10 +166,25 @@ resource "azurerm_container_app" "run_task" {
 
   secret {
     name  = "hmac-key"
-    value = var.run_task_hmac_key
+    value = local.hmac_key
   }
 
+  dynamic "secret" {
+    for_each = var.private_container_registry_password != "" ? [1] : []
+    content {
+      name  = "private-registry-password"
+      value = var.private_container_registry_password
+    }
+  }
 
+  dynamic "registry" {
+    for_each = var.use_private_registry && var.private_container_registry != "" && var.private_container_registry_username != "" && var.private_container_registry_password != "" ? [1] : []
+    content {
+      server               = var.private_container_registry
+      username             = var.private_container_registry_username
+      password_secret_name = "private-registry-password"
+    }
+  }
 }
 
 output "container_image" {
@@ -164,4 +193,9 @@ output "container_image" {
 
 output "default_domain_url" {
   value = "https://${azurerm_container_app.run_task.latest_revision_fqdn}"
+}
+
+output "hmac_key" {
+  value     = local.hmac_key
+  sensitive = true
 }

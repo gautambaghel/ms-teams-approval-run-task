@@ -75,7 +75,6 @@ app = Flask(__name__)
 
 # External config
 TEAMS_WEBHOOK_URL = os.environ.get("TEAMS_WEBHOOK_URL", "")
-BASE_PUBLIC_URL = os.environ.get("BASE_PUBLIC_URL", "")
 HMAC_KEY = os.environ.get("HMAC_KEY", "")
 
 # Toggle for skipping or auto-approving non-speculative runs
@@ -208,9 +207,10 @@ def teams_approval():
         vcs_commit_url = payload.get("vcs_commit_url")
         workspace_app_url = payload.get("workspace_app_url")
 
-        # Build Approve/Reject links
-        approve_link = f"{BASE_PUBLIC_URL}/approve?run_id={run_id}"
-        reject_link  = f"{BASE_PUBLIC_URL}/reject?run_id={run_id}"
+        # Build Approve/Reject links - get latest hostname from env var
+        base_public_url = os.environ.get('CONTAINER_APP_HOSTNAME', '')
+        approve_link = f"https://{base_public_url}/approve?run_id={run_id}"
+        reject_link  = f"https://{base_public_url}/reject?run_id={run_id}"
 
         message_lines = [
             f"Workspace **{workspace}** has requested approval.",
