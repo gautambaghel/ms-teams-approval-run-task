@@ -2,6 +2,7 @@ import os
 import requests
 import hmac
 import hashlib
+import uuid
 
 from flask import Flask, request, jsonify
 
@@ -33,12 +34,15 @@ if REDIS_URL and redis is not None:
         print(f"Failed to connect to Redis ({REDIS_URL}): {e}")
         print("Falling back to in-memory storage.")
 else:
-    print("Redis not configured or redis library not available. Using in-memory storage.")
+    print(
+        "Redis not configured or redis library not available. Using in-memory storage."
+    )
 
 #
 # In-Memory Fallback Store
 #
 pending_callbacks_memory = {}
+
 
 #
 # Helper functions for ephemeral data
@@ -46,13 +50,16 @@ pending_callbacks_memory = {}
 def store_token(run_id, data, ttl_seconds=600):
     if REDIS_ENABLED and redis_client:
         import json
+
         redis_client.setex(run_id, ttl_seconds, json.dumps(data))
     else:
         pending_callbacks_memory[run_id] = data
 
+
 def get_token(run_id):
     if REDIS_ENABLED and redis_client:
         import json
+
         raw = redis_client.get(run_id)
         if raw is None:
             return None
@@ -60,12 +67,18 @@ def get_token(run_id):
     else:
         return pending_callbacks_memory.get(run_id)
 
+
 def remove_token(run_id):
     if REDIS_ENABLED and redis_client:
         redis_client.delete(run_id)
     else:
         if run_id in pending_callbacks_memory:
             del pending_callbacks_memory[run_id]
+
+
+def generate_uuid_based():
+    """Generate an alphanumeric string based on UUID"""
+    return str(uuid.uuid4()).replace("-", "")[:12]
 
 
 #
@@ -78,7 +91,9 @@ TEAMS_WEBHOOK_URL = os.environ.get("TEAMS_WEBHOOK_URL", "")
 HMAC_KEY = os.environ.get("HMAC_KEY", "")
 
 # Toggle for skipping or auto-approving non-speculative runs
-FILTER_SPECULATIVE_PLANS_ONLY = os.environ.get("FILTER_SPECULATIVE_PLANS_ONLY", "false").lower() in ("1", "true", "yes")
+FILTER_SPECULATIVE_PLANS_ONLY = os.environ.get(
+    "FILTER_SPECULATIVE_PLANS_ONLY", "false"
+).lower() in ("1", "true", "yes")
 
 # Warning if HMAC_KEY not present
 if not HMAC_KEY:
@@ -91,7 +106,7 @@ if FILTER_SPECULATIVE_PLANS_ONLY:
 @app.before_request
 def verify_hmac():
     """
-    Enforce HMAC checks ONLY on the POST /teams-approval route. 
+    Enforce HMAC checks ONLY on the POST /teams-approval route.
     """
     if request.path == "/teams-approval" and request.method == "POST":
         local_key_configured = bool(HMAC_KEY)
@@ -103,9 +118,7 @@ def verify_hmac():
             provided_signature = inbound_signature.strip()
             raw_body = request.get_data()
             computed_signature = hmac.new(
-                key=HMAC_KEY.encode("utf-8"),
-                msg=raw_body,
-                digestmod=hashlib.sha512
+                key=HMAC_KEY.encode("utf-8"), msg=raw_body, digestmod=hashlib.sha512
             ).hexdigest()
 
             if not hmac.compare_digest(computed_signature, provided_signature):
@@ -135,15 +148,12 @@ def patch_terraform_callback(access_token, callback_url, status, message):
     patch_body = {
         "data": {
             "type": "task-results",
-            "attributes": {
-                "status": status,
-                "message": message
-            }
+            "attributes": {"status": status, "message": message},
         }
     }
     headers = {
         "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/vnd.api+json"
+        "Content-Type": "application/vnd.api+json",
     }
 
     resp = requests.patch(callback_url, json=patch_body, headers=headers)
@@ -168,7 +178,7 @@ def teams_approval():
         access_token = payload.get("access_token")
         callback_url = payload.get("task_result_callback_url")
         run_id = payload.get("run_id", "unknown-run-id")
-        stage  = payload.get("stage", "unknown-stage")
+        stage = payload.get("stage", "unknown-stage")
         workspace = payload.get("workspace_name", "unknown-workspace")
         is_speculative = payload.get("is_speculative", False)
 
@@ -181,25 +191,32 @@ def teams_approval():
 
         # If user wants to only require approval for SPECULATIVE runs:
         if FILTER_SPECULATIVE_PLANS_ONLY and not is_speculative:
-            # Instead of 'skipping', we automatically "pass" (auto-approve) 
+            # Instead of 'skipping', we automatically "pass" (auto-approve)
             # so the pipeline doesn’t get stuck.
             try:
                 patch_terraform_callback(
                     access_token,
                     callback_url,
                     "passed",
-                    f"Run {run_id} auto-approved (non-speculative)."
+                    f"Run {run_id} auto-approved (non-speculative).",
                 )
-                print(f"Auto-approved non-speculative run {run_id} from workspace {workspace}")
+                print(
+                    f"Auto-approved non-speculative run {run_id} from workspace {workspace}"
+                )
                 return "Auto-approved non-speculative run", 200
             except Exception as e:
                 return f"Error auto-approving run: {str(e)}", 500
 
         # Otherwise (speculative or filter is off), proceed with manual approval flow:
-        store_token(run_id, {
-            "access_token": access_token,
-            "callback_url": callback_url
-        })
+        uuid_string = generate_uuid_based()
+        store_token(
+            run_id,
+            {
+                "access_token": access_token,
+                "callback_url": callback_url,
+                "uuid": uuid_string,
+            },
+        )
 
         run_created_by = payload.get("run_created_by", "")
         run_message = payload.get("run_message", "")
@@ -208,15 +225,19 @@ def teams_approval():
         workspace_app_url = payload.get("workspace_app_url")
 
         # Build Approve/Reject links - get latest hostname from env var
-        base_public_url = os.environ.get('CONTAINER_APP_HOSTNAME', '')
-        approve_link = f"https://{base_public_url}/approve?run_id={run_id}"
-        reject_link  = f"https://{base_public_url}/reject?run_id={run_id}"
+        base_public_url = os.environ.get("CONTAINER_APP_HOSTNAME", "")
+        approve_link = (
+            f"https://{base_public_url}/approve?run_id={run_id}&uuid={uuid_string}"
+        )
+        reject_link = (
+            f"https://{base_public_url}/reject?run_id={run_id}&uuid={uuid_string}"
+        )
 
         message_lines = [
             f"Workspace **{workspace}** has requested approval.",
             f"Run ID: **{run_id}**",
             f"Stage: **{stage}**",
-            f"Speculative: **{'Yes' if is_speculative else 'No'}**"
+            f"Speculative: **{'Yes' if is_speculative else 'No'}**",
         ]
         if run_created_by:
             message_lines.append(f"Triggered by: **{run_created_by}**")
@@ -231,10 +252,7 @@ def teams_approval():
 
         # Approve/Reject links
         message_lines.append(f"[Approve]({approve_link}) | [Reject]({reject_link})")
-
-        teams_message = {
-            "text": "\n\n".join(message_lines)
-        }
+        teams_message = {"text": "\n\n".join(message_lines)}
 
         # POST to Teams
         resp = requests.post(TEAMS_WEBHOOK_URL, json=teams_message)
@@ -254,6 +272,9 @@ def approve():
     run_id = request.args.get("run_id")
     if not run_id:
         return "Missing 'run_id' parameter", 400
+    uuid = request.args.get("uuid")
+    if not uuid:
+        return "Missing 'uuid' parameter", 400
 
     data = get_token(run_id)
     if not data:
@@ -261,15 +282,15 @@ def approve():
 
     access_token = data["access_token"]
     callback_url = data["callback_url"]
+    uuid_data = data["uuid"]
+
+    if uuid != uuid_data:
+        return "UUID mismatch. This link may have expired or been tampered with.", 403
+
     approval_message = f"Run {run_id} approved via Teams link."
 
     try:
-        patch_terraform_callback(
-            access_token,
-            callback_url,
-            "passed",
-            approval_message
-        )
+        patch_terraform_callback(access_token, callback_url, "passed", approval_message)
         remove_token(run_id)
         print(approval_message)
         return f"Run {run_id} APPROVED. You can close this page."
@@ -285,6 +306,9 @@ def reject():
     run_id = request.args.get("run_id")
     if not run_id:
         return "Missing 'run_id' parameter", 400
+    uuid = request.args.get("uuid")
+    if not uuid:
+        return "Missing 'uuid' parameter", 400
 
     data = get_token(run_id)
     if not data:
@@ -292,14 +316,16 @@ def reject():
 
     access_token = data["access_token"]
     callback_url = data["callback_url"]
+    uuid_data = data["uuid"]
+
+    if uuid != uuid_data:
+        return "UUID mismatch. This link may have expired or been tampered with.", 403
+
     rejection_message = f"Run {run_id} rejected via Teams link."
 
     try:
         patch_terraform_callback(
-            access_token,
-            callback_url,
-            "failed",
-            rejection_message
+            access_token, callback_url, "failed", rejection_message
         )
         remove_token(run_id)
         print(rejection_message)
